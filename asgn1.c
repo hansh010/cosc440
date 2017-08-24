@@ -174,7 +174,7 @@ R(asgn1_device.dev);
    * if end of data area of ramdisk reached before copying the requested
    *   return the size copied to the user space so far
    */
-  if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return -1;
+  if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return 0;
   printk(KERN_INFO"fpos:%d vs data: %d; pageNum: %d",*f_pos,asgn1_device.num_pages*PAGE_SIZE,asgn1_device.num_pages);
   printk(KERN_INFO"begine_page: %d; ",begin_page_no);
   list_for_each(ptr,&asgn1_device.mem_list){
