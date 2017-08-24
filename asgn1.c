@@ -174,7 +174,7 @@ R(asgn1_device.dev);
    * if end of data area of ramdisk reached before copying the requested
    *   return the size copied to the user space so far
    */
-  if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return-1;
+  if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return -1;
   printk(KERN_INFO"fpos:%d vs data: %d; pageNum: %d",*f_pos,asgn1_device.num_pages*PAGE_SIZE,asgn1_device.num_pages);
   printk(KERN_INFO"begine_page: %d; ",begin_page_no);
   list_for_each(ptr,&asgn1_device.mem_list){
@@ -268,7 +268,7 @@ ssize_t write(struct file *filp, const char __user *buf, size_t count,
    *   a while loop / do-while loop is recommended to handle this situation. 
    */
   printk(KERN_INFO"fpos:%d vs data: %d; pageNum: %d",*f_pos,asgn1_device.num_pages*PAGE_SIZE,asgn1_device.num_pages);
-  if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return -1;
+  if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return 0;
   printk(KERN_INFO"accessing write; ");
   printk(KERN_INFO"begine_page: %d; ",begin_page_no);
   list_for_each(ptr,&asgn1_device.mem_list){
@@ -324,6 +324,7 @@ ssize_t asgn1_write(struct file *filp, const char __user *buf, size_t count,
 }
 
 #define SET_NPROC_OP 1
+#define GET_MAJOR 2
 #define TEM_SET_NPROC _IOW(MYIOC_TYPE, SET_NPROC_OP, int) 
 
 /**
@@ -331,7 +332,7 @@ ssize_t asgn1_write(struct file *filp, const char __user *buf, size_t count,
  */
 long asgn1_ioctl (struct file *filp, unsigned cmd, unsigned long arg) {
   int nr;
-  int new_nprocs;
+  int new_nprocs=0;
   int result;
 
   /* COMPLETE ME */
@@ -342,7 +343,24 @@ long asgn1_ioctl (struct file *filp, unsigned cmd, unsigned long arg) {
      set max_nprocs accordingly, don't forget to check validity of the 
      value before setting max_nprocs
    */
- //` if(_IOC_TYPE(cmd)!=MYDRBASE)
+  printk(KERN_WARNING"enter ioctl");
+  if(_IOC_TYPE(cmd)!=MYIOC_TYPE)return -EINVAL;
+  nr=_IOC_NR(cmd);
+
+  switch(nr){
+  	case SET_NPROC_OP:
+		result=copy_from_user((int*)&new_nprocs, (int *)arg, sizeof(int));
+		if(result!=0)return -EINVAL;
+		if(new_nprocs>1 && new_nprocs>atomic_read(&asgn1_device.nprocs)){
+			atomic_set(&asgn1_device.max_nprocs,new_nprocs);
+			printk(KERN_INFO"new value: %d",new_nprocs);
+			return 0;
+		}
+	break;
+	case GET_MAJOR:return asgn1_major;
+  	default: return -EINVAL;
+  }
+  
   return -ENOTTY;
 }
 
@@ -522,7 +540,8 @@ int __init asgn1_init_module(void){
  }
 
   asgn1_device.num_pages=0;
- 
+  asgn1_device.data_size=0;
+
   printk(KERN_WARNING"fine before make page_head init;");
   INIT_LIST_HEAD(&asgn1_device.mem_list);
 	
