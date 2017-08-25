@@ -195,19 +195,22 @@ R(asgn1_device.dev);
           curr=list_entry(ptr,page_node,list);
   	  //only the begin page have offset, otherwise set offset to zero
 	  if(curr_page_no!=begin_page_no)begin_offset=0;
-	  printk(KERN_INFO"page:%d,  begin_offset: %d",curr_page_no,begin_offset);
+
 	  //size to be read should either be a whole page or some left overs.
 	  size_to_be_read=count>PAGE_SIZE-begin_offset? PAGE_SIZE-begin_offset:count;
-	  printk(KERN_INFO"page:%d, size_to_BE_read: %d",curr_page_no,size_to_be_read);
-	  printk(KERN_INFO"page %d, buf_off: %d",curr_page_no,size_read);
+
+
 	  //keep reading the whole data until success.
 	  //this is not the most efficient way to do. should only repeat read on those data that is fail to read.
-	  do{fails=copy_to_user(buf+size_read,page_address(curr->page)+begin_offset,size_to_be_read);printk(KERN_INFO"number of fails: %d",fails)    ;}while(fails!=0);
+	  do{fails=copy_to_user(buf+size_read,page_address(curr->page)+begin_offset,size_to_be_read);printk(KERN_INFO"number of fails: %d",fails)    ;}while(fails>0);
+	  if(fails<0)return fails;
           //reduce count, this represent the data left to read
           count-=size_to_be_read;
 	  //accumulate size  read so far
 	  size_read+=size_to_be_read;
 	  //if all read, jump out the loop
+	 
+	  
 	  if(count==0)break;
       }
       curr_page_no++;
@@ -303,7 +306,7 @@ ssize_t write(struct file *filp, const char __user *buf, size_t count,
   //reach end 
   if(*f_pos>=asgn1_device.num_pages*PAGE_SIZE)return 0;
   printk(KERN_INFO"accessing write; ");
-  printk(KERN_INFO"begine_page: %d; ",begin_page_no);
+ 
   list_for_each(ptr,&asgn1_device.mem_list){
   	
 	if(curr_page_no>=begin_page_no){
@@ -311,20 +314,20 @@ ssize_t write(struct file *filp, const char __user *buf, size_t count,
 	  curr=list_entry(ptr,page_node,list);
 	  //offset thing
 	  if(curr_page_no!=begin_page_no)begin_offset=0;
-	  printk(KERN_INFO"page:%d,  begin_offset: %d",curr_page_no,begin_offset);
+
 	  //size to be read
 	  size_to_be_written=count>PAGE_SIZE-begin_offset? PAGE_SIZE-begin_offset:count;
-	  printk(KERN_INFO"page:%d, size_to_BE_written: %d",curr_page_no,size_to_be_written);
-          printk(KERN_INFO"page %d, buf_off: %d",curr_page_no,size_written);
+
+
 	  
 	  
 	  //loop until success
-	  do{fails=copy_from_user(page_address(curr->page)+begin_offset,buf+size_written,size_to_be_written);printk(KERN_INFO"number of fails: %d",fails);}while(fails!=0);	  
-	  printk(KERN_INFO"page:%d, count before: %d",curr_page_no,count);
+	  do{fails=copy_from_user(page_address(curr->page)+begin_offset,buf+size_written,size_to_be_written);printk(KERN_INFO"number of fails: %d",fails);}while(fails>0);	  
+	  if(fails<0)return fails;
 	  //change count
 	  count-=size_to_be_written;
 	  size_written+=size_to_be_written;
-	  printk(KERN_INFO"page:%d, count after: %d",curr_page_no,count);
+
 	  if(count==0)break;
 	}
 	curr_page_no++;
@@ -377,6 +380,7 @@ ssize_t asgn1_write(struct file *filp, const char __user *buf, size_t count,
 
 #define SET_NPROC_OP 1
 #define GET_MAJOR 2
+#define GET_DATASIZE 3
 #define TEM_SET_NPROC _IOW(MYIOC_TYPE, SET_NPROC_OP, int) 
 
 /**
@@ -419,7 +423,11 @@ long asgn1_ioctl (struct file *filp, unsigned cmd, unsigned long arg) {
 		result=copy_to_user((int*)arg, (int*)&asgn1_major,sizeof(int));
 		if(result!=0)return -EINVAL;
 		else return 0;
-  	default: return -EINVAL;
+  	case GET_DATASIZE:
+		result=copy_to_user((int*)arg, (int*)&asgn1_device.data_size, sizeof(int));
+		if(result!=0)return -EINVAL;
+		else return 0;
+	default: return -EINVAL;
   }
   
   return -ENOTTY;
@@ -605,7 +613,7 @@ int __init asgn1_init_module(void){
 
  atomic_set(&asgn1_device.max_nprocs,5);
  
- //create a proc. Not very sure if I'm suppose to do so
+ //create a proc. helps to debug.
  struct proc_dir_entry *file;
  file= proc_create("asgn1_device",0644,NULL,&asgn1_proc_ops);
  if(!file){
