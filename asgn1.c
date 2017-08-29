@@ -454,7 +454,7 @@ static int asgn1_mmap (struct file *filp, struct vm_area_struct *vma)
      printk(KERN_WARNING"enter mmp. offset: %ld, len: %ld, ramdisk_size: %ld",offset,len,ramdisk_size);
      printk(KERN_WARNING"vma info: vma_start: %d, vma_end: %d, vma_pgoff:%ld",vma->vm_start,vma->vm_end, vma->vm_pgoff);
     //out of range check.
-    if(offset+len > ramdisk_size)return -1;
+    if(offset*PAGE_SIZE+len > ramdisk_size)return -1;
     list_for_each_entry(curr,&asgn1_device.mem_list,list){
     	if(index>=offset){
 	//when first page reached, start operation
